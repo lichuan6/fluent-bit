@@ -1,3 +1,7 @@
+FROM golang:1.15 as builder0
+RUN git clone https://github.com/lichuan6/fluent-bit-pulsar-go
+RUN cd fluent-bit-pulsar-go && go build -buildname=c-shared -o /out_pulsar.so main.go
+
 FROM debian:buster as builder
 
 # Fluent Bit version
@@ -41,6 +45,7 @@ RUN cmake -DFLB_DEBUG=Off \
           -DFLB_HTTP_SERVER=On \
           -DFLB_IN_SYSTEMD=On \
           -DFLB_OUT_KAFKA=On \
+          -DFLB_PROXY_GO=On \
           -DFLB_OUT_PGSQL=On ../
 
 RUN make -j $(getconf _NPROCESSORS_ONLN)
@@ -56,6 +61,7 @@ COPY conf/fluent-bit.conf \
      conf/parsers_cinder.conf \
      conf/plugins.conf \
      /fluent-bit/etc/
+
 
 FROM gcr.io/distroless/cc-debian10
 LABEL maintainer="Eduardo Silva <eduardo@treasure-data.com>"
@@ -96,6 +102,8 @@ COPY --from=builder /lib/x86_64-linux-gnu/libcom_err* /lib/x86_64-linux-gnu/
 COPY --from=builder /lib/x86_64-linux-gnu/libkeyutils* /lib/x86_64-linux-gnu/
 
 COPY --from=builder /fluent-bit /fluent-bit
+
+COPY --from=builder0 /out_pulsar.so /out_pulsar.so
 
 #
 EXPOSE 2020
